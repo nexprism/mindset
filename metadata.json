@@ -1,0 +1,7 @@
+{
+  "name": "Lapaas Mindset",
+  "description": "A bilingual (Hindi/English), login-free 21-day mindset training application focused on habit formation and personal growth.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
