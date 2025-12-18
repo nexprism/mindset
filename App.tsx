@@ -28,7 +28,10 @@ const Layout: React.FC<{
   setShowInstallPrompt: (show: boolean) => void 
 }> = ({ children, userState, onToggleLang, deferredPrompt, setShowInstallPrompt }) => {
   const location = useLocation();
-  const isImmersive = location.pathname === '/' || location.pathname.includes('/day/') || location.pathname.includes('/onboarding') || location.pathname.includes('/landing') || location.pathname.includes('/privacy') || location.pathname.includes('/terms') || location.pathname.includes('/contact');
+  // Pages that should hide header/nav (immersive mode)
+  // Note: '/' shows Landing for new users (hide nav) or Home for returning users (show nav)
+  const isLandingPage = location.pathname === '/' && !userState.hasCompletedOnboarding;
+  const isImmersive = isLandingPage || location.pathname.includes('/day/') || location.pathname.includes('/onboarding') || location.pathname.includes('/landing') || location.pathname.includes('/privacy') || location.pathname.includes('/terms') || location.pathname.includes('/contact');
   const showNav = userState.hasCompletedOnboarding && !isImmersive;
   
   // Use a ref to track if we've shown the prompt in this session to avoid spamming on navigation
