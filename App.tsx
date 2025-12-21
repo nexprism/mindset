@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getStorageData, setLanguagePreference, setThemePreference, setReminderPreference, resetApp } from './services/storage';
-import { UserState, Theme, ReminderSettings } from './types';
+import { UserState, Theme, ReminderSettings, Language } from './types';
 import { UI_LABELS, MODULES } from './constants';
-import { checkAndTriggerNotifications, getNotificationContent, showNotification, NOTIFICATION_TIMES, setupNativeNotificationListener, isNativePlatform, scheduleNativeDailyNotifications } from './services/notifications';
+import { checkAndTriggerNotifications, getNotificationContent, showNotification, NOTIFICATION_TIMES } from './services/notifications';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import Home from './pages/Home';
@@ -14,6 +14,7 @@ import DayView from './pages/DayView';
 import ReviewModule from './pages/ReviewModule';
 import Journal from './pages/Journal';
 import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 import Landing from './pages/Landing';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
@@ -28,10 +29,7 @@ const Layout: React.FC<{
   setShowInstallPrompt: (show: boolean) => void 
 }> = ({ children, userState, onToggleLang, deferredPrompt, setShowInstallPrompt }) => {
   const location = useLocation();
-  // Pages that should hide header/nav (immersive mode)
-  // Note: '/' shows Landing for new users (hide nav) or Home for returning users (show nav)
-  const isLandingPage = location.pathname === '/' && !userState.hasCompletedOnboarding;
-  const isImmersive = isLandingPage || location.pathname.includes('/day/') || location.pathname.includes('/onboarding') || location.pathname.includes('/landing') || location.pathname.includes('/privacy') || location.pathname.includes('/terms') || location.pathname.includes('/contact');
+  const isImmersive = location.pathname === '/' || location.pathname.includes('/day/') || location.pathname.includes('/onboarding') || location.pathname.includes('/landing') || location.pathname.includes('/privacy') || location.pathname.includes('/terms') || location.pathname.includes('/contact');
   const showNav = userState.hasCompletedOnboarding && !isImmersive;
   
   // Use a ref to track if we've shown the prompt in this session to avoid spamming on navigation
@@ -76,11 +74,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // Initial Load
     loadData();
-    
-    // Setup native notification listener for mobile
-    if (isNativePlatform()) {
-      setupNativeNotificationListener();
-    }
+
   }, []);
 
   // Theme Management Effect
@@ -181,7 +175,8 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const toggleLanguage = () => { if (!userState) return; const updated = setLanguagePreference(userState.language === 'en' ? 'hi' : 'en'); setUserState(updated); };
+  const handleSetLanguage = (lang: Language) => { const updated = setLanguagePreference(lang); setUserState(updated); };
+  const toggleLanguage = () => { if (!userState) return; handleSetLanguage(userState.language === 'en' ? 'hi' : 'en'); };
   const handleSetTheme = (newTheme: Theme) => { const updated = setThemePreference(newTheme); setUserState(updated); };
   const handleSetReminder = (settings: ReminderSettings) => { const updated = setReminderPreference(settings); setUserState(updated); };
   const handleResetApp = () => { resetApp(); loadData(); };
@@ -202,19 +197,29 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 selection:bg-orange-100 selection:text-orange-900 pb-safe transition-colors duration-300">
         <Layout userState={userState} onToggleLang={toggleLanguage} deferredPrompt={deferredPrompt} setShowInstallPrompt={setShowInstallPrompt}>
             <Routes>
-            <Route path="/" element={userState.hasCompletedOnboarding ? <Home userState={userState} /> : <Landing />} />
+            <Route
+              path="/"
+              element={
+                userState.hasCompletedOnboarding ? (
+                  <Navigate to="/home" replace />
+                ) : (
+                  <Landing deferredPrompt={deferredPrompt} onInstall={handleInstallClick} />
+                )
+              }
+            />
             <Route path="/home" element={userState.hasCompletedOnboarding ? <Home userState={userState} /> : <Navigate to="/onboarding" replace />} />
             <Route path="/onboarding" element={<Onboarding lang={userState.language} onComplete={loadData} />} />
             <Route path="/journal" element={<Journal userState={userState} />} />
             <Route path="/profile" element={<Profile userState={userState} installPrompt={deferredPrompt} onToggleLang={toggleLanguage} onReset={handleResetApp} onSetTheme={handleSetTheme} onSetReminder={handleSetReminder} onUpdate={loadData} />} />
+            <Route path="/settings" element={<Settings userState={userState} lang={userState.language} onSetLanguage={handleSetLanguage} onSetTheme={handleSetTheme} onSetReminder={handleSetReminder} onReset={handleResetApp} onUpdate={loadData} />} />
             <Route path="/module/:moduleId" element={<ModuleDetail userState={userState} onUpdate={loadData} />} />
             <Route path="/module/:moduleId/day/:dayNumber" element={<DayView userState={userState} onUpdate={loadData} onToggleLang={toggleLanguage} />} />
             <Route path="/module/:moduleId/review" element={<ReviewModule userState={userState} />} />
-            <Route path="/landing" element={<Landing />} />
+            <Route path="/landing" element={<Landing deferredPrompt={deferredPrompt} onInstall={handleInstallClick} />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/home" replace />} />
             </Routes>
         </Layout>
         {showInstallPrompt && <InstallPrompt onInstall={handleInstallClick} onDismiss={() => setShowInstallPrompt(false)} lang={userState.language} />}

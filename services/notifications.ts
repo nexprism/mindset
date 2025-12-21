@@ -1,7 +1,5 @@
-import { LocalizedString } from '../types';
+import { LocalizedString, Language } from '../types';
 import { MODULES } from '../constants';
-import { Capacitor } from '@capacitor/core';
-import { LocalNotifications } from '@capacitor/local-notifications';
 
 // ==========================================
 // NOTIFICATION STRATEGY
@@ -17,11 +15,26 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 // - Current day's title, task, and reflection prompt
 // - Redirects to specific day page
 
+// Helper to expand {en, hi} to full LocalizedString using English as fallback
+type SimpleLocalized = { en: string; hi: string };
+const expandToLocalized = (s: SimpleLocalized): LocalizedString => ({
+  en: s.en, hi: s.hi,
+  es: s.en, fr: s.en, de: s.en, zh: s.en, ja: s.en, pt: s.en, ru: s.en, it: s.en, ar: s.en
+});
+
+// Notification content with simple {en, hi} that will be expanded
+interface SimpleNotificationContent {
+  title: SimpleLocalized;
+  body: SimpleLocalized;
+  icon?: string;
+  url?: string;
+}
+
 export interface NotificationContent {
   title: LocalizedString;
   body: LocalizedString;
   icon?: string;
-  url?: string; // URL to redirect when notification is clicked
+  url?: string;
 }
 
 export interface DayNotifications {
@@ -30,8 +43,14 @@ export interface DayNotifications {
   evening: NotificationContent;
 }
 
-// Generic motivational messages for any mindset
-const GENERIC_NOTIFICATIONS: DayNotifications[] = [
+interface SimpleDayNotifications {
+  morning: SimpleNotificationContent;
+  midday: SimpleNotificationContent;
+  evening: SimpleNotificationContent;
+}
+
+// Generic motivational messages for any mindset (stored as simple {en, hi} for maintainability)
+const GENERIC_NOTIFICATIONS_SIMPLE: SimpleDayNotifications[] = [
   // Day 1
   {
     morning: {
@@ -349,8 +368,8 @@ const GENERIC_NOTIFICATIONS: DayNotifications[] = [
   }
 ];
 
-// Module-specific motivational prefixes
-const MODULE_PREFIXES: Record<string, { en: string; hi: string }> = {
+// Module-specific motivational prefixes (simple {en, hi} format)
+const MODULE_PREFIXES: Record<string, SimpleLocalized> = {
   financial: { en: "💰 Money Mindset", hi: "💰 पैसे की सोच" },
   health: { en: "💪 Health Power", hi: "💪 स्वास्थ्य शक्ति" },
   mindful_eating: { en: "🍎 Mindful Eating", hi: "🍎 सजग भोजन" },
@@ -392,9 +411,12 @@ export const getNotificationContent = (
   moduleId: string,
   dayNumber: number,
   notificationType: 'morning' | 'midday' | 'evening',
-  lang: 'en' | 'hi' = 'en'
+  lang: Language = 'en'
 ): { title: string; body: string; url: string } => {
-  const prefix = MODULE_PREFIXES[moduleId] || MODULE_PREFIXES.financial;
+  const prefixData = MODULE_PREFIXES[moduleId] || MODULE_PREFIXES.financial;
+  // Use 'en' or 'hi' for prefix lookup, fallback to 'en' for other languages
+  const prefixLang = (lang === 'en' || lang === 'hi') ? lang : 'en';
+  const prefix = prefixData[prefixLang];
   const dayContent = getDayContent(moduleId, dayNumber);
   const url = `/module/${moduleId}/day/${dayNumber}`;
   
@@ -406,8 +428,8 @@ export const getNotificationContent = (
       case 'morning':
         // Morning: Introduce today's topic
         return {
-          title: `${prefix[lang]} - ${lang === 'en' ? 'Good Morning!' : 'सुप्रभात!'}`,
-          body: `${lang === 'en' ? "Today's lesson:" : 'आज का पाठ:'} ${day.title[lang]}`,
+          title: `${prefix} - ${lang === 'en' ? 'Good Morning!' : lang === 'hi' ? 'सुप्रभात!' : 'Good Morning!'}`,
+          body: `${lang === 'en' ? "Today's lesson:" : lang === 'hi' ? 'आज का पाठ:' : "Today's lesson:"} ${day.title[lang]}`,
           url
         };
       
@@ -415,7 +437,7 @@ export const getNotificationContent = (
         // Midday: Remind about today's task
         const taskPreview = day.task[lang].substring(0, 80) + (day.task[lang].length > 80 ? '...' : '');
         return {
-          title: `${prefix[lang]} - ${lang === 'en' ? 'Time for Action!' : 'एक्शन का समय!'}`,
+          title: `${prefix} - ${lang === 'en' ? 'Time for Action!' : lang === 'hi' ? 'एक्शन का समय!' : 'Time for Action!'}`,
           body: taskPreview,
           url
         };
@@ -423,14 +445,14 @@ export const getNotificationContent = (
       case 'evening':
         // Evening: Reflection prompt
         return {
-          title: `${prefix[lang]} - ${lang === 'en' ? '🌙 Reflection Time' : '🌙 मनन का समय'}`,
+          title: `${prefix} - ${lang === 'en' ? '🌙 Reflection Time' : lang === 'hi' ? '🌙 मनन का समय' : '🌙 Reflection Time'}`,
           body: day.reflectionPrompt[lang],
           url
         };
       
       default:
         return {
-          title: prefix[lang],
+          title: prefix,
           body: day.title[lang],
           url
         };
@@ -438,12 +460,14 @@ export const getNotificationContent = (
   }
   
   // Fallback to generic notifications if content not found
-  const dayIndex = Math.min(dayNumber - 1, GENERIC_NOTIFICATIONS.length - 1);
-  const notification = GENERIC_NOTIFICATIONS[dayIndex][notificationType];
+  const dayIndex = Math.min(dayNumber - 1, GENERIC_NOTIFICATIONS_SIMPLE.length - 1);
+  const notification = GENERIC_NOTIFICATIONS_SIMPLE[dayIndex][notificationType];
+  // Use 'en' or 'hi' for notification lookup, fallback to 'en' for other languages
+  const notifLang = (lang === 'en' || lang === 'hi') ? lang : 'en';
   
   return {
-    title: `${prefix[lang]} - ${notification.title[lang]}`,
-    body: notification.body[lang],
+    title: `${prefix[notifLang]} - ${notification.title[notifLang]}`,
+    body: notification.body[notifLang],
     url
   };
 };
@@ -455,31 +479,13 @@ export const NOTIFICATION_TIMES = {
   evening: { hour: 20, minute: 0 }
 };
 
-// Check if running on native platform
-export const isNativePlatform = (): boolean => {
-  return Capacitor.isNativePlatform();
-};
-
 // Check if browser supports notifications
 export const isNotificationSupported = (): boolean => {
-  if (isNativePlatform()) {
-    return true; // Capacitor handles notifications
-  }
   return 'Notification' in window;
 };
 
 // Request notification permission
 export const requestNotificationPermission = async (): Promise<NotificationPermission> => {
-  if (isNativePlatform()) {
-    try {
-      const result = await LocalNotifications.requestPermissions();
-      return result.display === 'granted' ? 'granted' : 'denied';
-    } catch (e) {
-      console.error('Native notification permission error:', e);
-      return 'denied';
-    }
-  }
-  
   if (!isNotificationSupported()) {
     return 'denied';
   }
@@ -488,27 +494,10 @@ export const requestNotificationPermission = async (): Promise<NotificationPermi
 
 // Get current notification permission
 export const getNotificationPermission = (): NotificationPermission => {
-  if (isNativePlatform()) {
-    // For native, we'll check asynchronously but return default for sync call
-    return 'default';
-  }
   if (!isNotificationSupported()) {
     return 'denied';
   }
   return Notification.permission;
-};
-
-// Check native notification permission asynchronously
-export const checkNativeNotificationPermission = async (): Promise<NotificationPermission> => {
-  if (isNativePlatform()) {
-    try {
-      const result = await LocalNotifications.checkPermissions();
-      return result.display === 'granted' ? 'granted' : 'denied';
-    } catch (e) {
-      return 'denied';
-    }
-  }
-  return getNotificationPermission();
 };
 
 // Show a notification immediately with optional redirect URL
@@ -518,35 +507,6 @@ export const showNotification = async (
   url?: string,
   options?: NotificationOptions
 ): Promise<boolean> => {
-  // For native platforms, use Capacitor Local Notifications
-  if (isNativePlatform()) {
-    try {
-      const permission = await checkNativeNotificationPermission();
-      if (permission !== 'granted') {
-        return false;
-      }
-      
-      await LocalNotifications.schedule({
-        notifications: [
-          {
-            id: Date.now(),
-            title,
-            body,
-            schedule: { at: new Date(Date.now() + 100) }, // Immediate
-            extra: { url },
-            sound: 'default',
-            actionTypeId: 'OPEN_APP'
-          }
-        ]
-      });
-      return true;
-    } catch (error) {
-      console.error('Native notification error:', error);
-      return false;
-    }
-  }
-
-  // Web notifications
   if (getNotificationPermission() !== 'granted') {
     return false;
   }
@@ -657,7 +617,7 @@ export const clearJourneyNotifications = (moduleId: string): void => {
 };
 
 // Get reminder notification content (for manual reminder)
-export const getReminderNotification = (lang: 'en' | 'hi' = 'en'): { title: string; body: string } => {
+export const getReminderNotification = (lang: Language = 'en'): { title: string; body: string } => {
   return {
     title: lang === 'en' ? '🧠 Level Up Time!' : '🧠 लेवल बढ़ाने का समय!',
     body: lang === 'en' 
@@ -666,95 +626,5 @@ export const getReminderNotification = (lang: 'en' | 'hi' = 'en'): { title: stri
   };
 };
 
-// Schedule daily notifications for native mobile (Capacitor)
-export const scheduleNativeDailyNotifications = async (
-  moduleId: string,
-  currentDay: number,
-  lang: 'en' | 'hi' = 'en'
-): Promise<boolean> => {
-  if (!isNativePlatform()) {
-    return false;
-  }
-
-  try {
-    const permission = await checkNativeNotificationPermission();
-    if (permission !== 'granted') {
-      return false;
-    }
-
-    // Cancel existing scheduled notifications
-    await LocalNotifications.cancel({ notifications: [{ id: 1 }, { id: 2 }, { id: 3 }] });
-
-    const today = new Date();
-    const url = `/module/${moduleId}/day/${currentDay}`;
-
-    // Get content for each notification type
-    const morningContent = getNotificationContent(moduleId, currentDay, 'morning', lang);
-    const middayContent = getNotificationContent(moduleId, currentDay, 'midday', lang);
-    const eveningContent = getNotificationContent(moduleId, currentDay, 'evening', lang);
-
-    // Schedule morning notification (7:00 AM)
-    const morningTime = new Date(today);
-    morningTime.setHours(NOTIFICATION_TIMES.morning.hour, NOTIFICATION_TIMES.morning.minute, 0, 0);
-    if (morningTime <= today) morningTime.setDate(morningTime.getDate() + 1);
-
-    // Schedule midday notification (1:00 PM)
-    const middayTime = new Date(today);
-    middayTime.setHours(NOTIFICATION_TIMES.midday.hour, NOTIFICATION_TIMES.midday.minute, 0, 0);
-    if (middayTime <= today) middayTime.setDate(middayTime.getDate() + 1);
-
-    // Schedule evening notification (8:00 PM)
-    const eveningTime = new Date(today);
-    eveningTime.setHours(NOTIFICATION_TIMES.evening.hour, NOTIFICATION_TIMES.evening.minute, 0, 0);
-    if (eveningTime <= today) eveningTime.setDate(eveningTime.getDate() + 1);
-
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: 1,
-          title: morningContent.title,
-          body: morningContent.body,
-          schedule: { at: morningTime, repeats: true, every: 'day' },
-          extra: { url },
-          sound: 'default'
-        },
-        {
-          id: 2,
-          title: middayContent.title,
-          body: middayContent.body,
-          schedule: { at: middayTime, repeats: true, every: 'day' },
-          extra: { url },
-          sound: 'default'
-        },
-        {
-          id: 3,
-          title: eveningContent.title,
-          body: eveningContent.body,
-          schedule: { at: eveningTime, repeats: true, every: 'day' },
-          extra: { url },
-          sound: 'default'
-        }
-      ]
-    });
-
-    return true;
-  } catch (error) {
-    console.error('Failed to schedule native notifications:', error);
-    return false;
-  }
-};
-
-// Setup notification click listener for native
-export const setupNativeNotificationListener = (): void => {
-  if (!isNativePlatform()) return;
-
-  LocalNotifications.addListener('localNotificationActionPerformed', (notification) => {
-    const url = notification.notification.extra?.url;
-    if (url && typeof window !== 'undefined') {
-      window.location.href = url;
-    }
-  });
-};
-
 // Export types and constants
-export { GENERIC_NOTIFICATIONS, MODULE_PREFIXES };
+export { GENERIC_NOTIFICATIONS_SIMPLE as GENERIC_NOTIFICATIONS, MODULE_PREFIXES };

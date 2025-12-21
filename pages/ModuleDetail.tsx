@@ -17,6 +17,7 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({ userState, onUpdate }) => {
   const lang = userState.language;
   const [imgError, setImgError] = useState(false);
   const currentDayRef = useRef<HTMLDivElement>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
   
   const module = MODULES.find(m => m.id === moduleId);
   const progress = userState.progress[moduleId || ''];
@@ -67,15 +68,14 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({ userState, onUpdate }) => {
   const nextPlayableDay = isNextDayLockedByTime ? -1 : maxCompletedDay + 1;
 
   const handleReset = () => {
-    const confirmMsg = lang === 'en' 
-        ? "Are you sure? This will delete all progress and journals for this journey. You will be able to pick a new journey."
-        : "क्या आप निश्चित हैं? यह इस यात्रा के लिए सभी प्रगति और पत्रिकाओं को हटा देगा। आप एक नई यात्रा चुनने में सक्षम होंगे।";
-        
-    if (confirm(confirmMsg)) {
-      resetModule(module.id);
-      onUpdate();
-      navigate('/');
-    }
+    setShowResetModal(true);
+  };
+
+  const confirmReset = () => {
+    resetModule(module.id);
+    onUpdate();
+    setShowResetModal(false);
+    navigate('/');
   };
 
   // Helper for banner fallback gradient
@@ -126,7 +126,7 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({ userState, onUpdate }) => {
              </div>
         ) : (
             <div className="pt-24 pb-12 px-6 relative z-10 text-white">
-                <Link to="/" className="inline-flex items-center text-white/70 hover:text-white mb-6 transition-colors bg-black/20 px-3 py-1 rounded-full backdrop-blur-sm">
+                <Link to="/home" className="inline-flex items-center text-white/70 hover:text-white mb-6 transition-colors bg-black/20 px-3 py-1 rounded-full backdrop-blur-sm">
                     <ArrowLeft size={16} className="mr-2" /> {UI_LABELS.home[lang]}
                 </Link>
                 <h1 className="text-4xl font-extrabold mb-2 tracking-tight drop-shadow-lg leading-tight">{module.title[lang]}</h1>
@@ -210,6 +210,43 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({ userState, onUpdate }) => {
             </button>
         </div>
       </div>
+
+      {/* Reset Confirmation Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                <RefreshCw size={24} className="text-red-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                {lang === 'en' ? 'Reset Journey?' : 'यात्रा रीसेट करें?'}
+              </h3>
+            </div>
+            
+            <p className="text-slate-300 mb-6 leading-relaxed">
+              {lang === 'en' 
+                ? 'This will delete all progress and journals for this journey. You will be able to pick a new journey.'
+                : 'यह इस यात्रा के लिए सभी प्रगति और पत्रिकाओं को हटा देगा। आप एक नई यात्रा चुनने में सक्षम होंगे।'}
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowResetModal(false)}
+                className="flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition-colors"
+              >
+                {lang === 'en' ? 'Cancel' : 'रद्द करें'}
+              </button>
+              <button
+                onClick={confirmReset}
+                className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors"
+              >
+                {lang === 'en' ? 'Reset' : 'रीसेट करें'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

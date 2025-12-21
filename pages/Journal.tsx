@@ -269,7 +269,7 @@ const Journal: React.FC<JournalProps> = ({ userState }) => {
                             Journaling connects your conscious goals with your subconscious habits. Start a module to begin writing.
                         </p>
                         <Link 
-                            to="/" 
+                            to="/home" 
                             className="inline-flex items-center px-8 py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-bold shadow-lg shadow-orange-200 dark:shadow-none transition-all transform hover:scale-105"
                         >
                             {UI_LABELS.startJourney[lang]} <ArrowRight size={20} className="ml-2" />
@@ -319,6 +319,8 @@ const Journal: React.FC<JournalProps> = ({ userState }) => {
                                 <Search size={16} className="text-slate-400" />
                             </div>
                             <input 
+                                id="journal-search"
+                                name="journal-search"
                                 type="text" 
                                 placeholder="Search your entries..." 
                                 value={searchQuery}

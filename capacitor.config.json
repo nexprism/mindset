@@ -10,16 +10,6 @@
     "SplashScreen": {
       "launchShowDuration": 2000,
       "launchAutoHide": true,
-      "backgroundColor": "#ea580c",
-      "showSpinner": false
-    },
-    "LocalNotifications": {
-      "smallIcon": "ic_stat_icon",
-      "iconColor": "#ea580c",
-      "sound": "default"
-    },
-    "StatusBar": {
-      "style": "dark",
       "backgroundColor": "#ea580c"
     }
   }

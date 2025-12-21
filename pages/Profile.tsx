@@ -7,7 +7,7 @@ import {
   Target, Smile, Zap, Heart, Anchor, Feather, Code, Music, Coffee, CloudLightning, PenTool, Info, Download, Smartphone, Clock
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import NotificationManager from '../components/NotificationManager';
+import Certificate from '../components/Certificate';
 import { setUserName, updateUserProfile, saveStorageData, getStorageData, addDailyGoal, deleteDailyGoal, toggleDailyGoal, triggerHaptic } from '../services/storage';
 
 interface ProfileProps {
@@ -238,6 +238,11 @@ const Profile: React.FC<ProfileProps> = ({ userState, installPrompt, onToggleLan
   // Daily Goals State
   const [newGoalText, setNewGoalText] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showDeleteGoalModal, setShowDeleteGoalModal] = useState<string | null>(null);
+  const [showResetAllModal, setShowResetAllModal] = useState(false);
+  const [showInstallInstructions, setShowInstallInstructions] = useState(false);
+  const [showCalendarDetail, setShowCalendarDetail] = useState(false);
+  const [showCertificate, setShowCertificate] = useState<string | null>(null);
 
   // Install State
   const [isIOS, setIsIOS] = useState(false);
@@ -273,7 +278,52 @@ const Profile: React.FC<ProfileProps> = ({ userState, installPrompt, onToggleLan
 
   const shareText = `I'm a Level ${levelInfo.level} ${levelInfo.title} on Lapaas Mindset! 🔥\n${stats.xp} XP earned.`;
   const shareUrl = window.location.origin;
-  const handleCopy = () => { navigator.clipboard.writeText(`${shareText}\n${shareUrl}`); setShowShareModal(false); };
+  const handleCopy = () => { navigator.clipboard.writeText(`${shareText}\n${shareUrl}`); };
+
+
+  // Get activities for selected date
+  const getSelectedDateActivities = () => {
+    if (!selectedDate) return [];
+    const activities: { moduleId: string; moduleName: string; dayNumber: number; type: 'completed' | 'journal'; text?: string }[] = [];
+    const selectedDateStr = selectedDate.toLocaleDateString('en-CA');
+    
+    Object.entries(userState.progress).forEach(([moduleId, prog]: [string, any]) => {
+      const module = MODULES.find(m => m.id === moduleId);
+      if (!module) return;
+      
+      if (prog.journal) {
+        Object.entries(prog.journal).forEach(([dayNum, entry]: [string, any]) => {
+          const entryDate = new Date(entry.timestamp).toLocaleDateString('en-CA');
+          if (entryDate === selectedDateStr) {
+            activities.push({
+              moduleId,
+              moduleName: module.title[lang],
+              dayNumber: parseInt(dayNum),
+              type: 'journal',
+              text: entry.text
+            });
+          }
+        });
+      }
+    });
+    
+    return activities;
+  };
+
+  // Share via Web Share API
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'My Lapaas Mindset Progress',
+          text: shareText,
+          url: shareUrl
+        });
+      } catch (err) {
+        console.log('Share cancelled');
+      }
+    }
+  };
   
   const handleSaveProfile = () => {
       triggerHaptic('success');
@@ -301,9 +351,14 @@ const Profile: React.FC<ProfileProps> = ({ userState, installPrompt, onToggleLan
 
   const handleDeleteGoal = (id: string) => {
       triggerHaptic('heavy');
-      if(confirm('Delete this goal?')) {
-        deleteDailyGoal(id);
+      setShowDeleteGoalModal(id);
+  };
+
+  const confirmDeleteGoal = () => {
+      if (showDeleteGoalModal) {
+        deleteDailyGoal(showDeleteGoalModal);
         if(onUpdate) onUpdate();
+        setShowDeleteGoalModal(null);
       }
   };
   
@@ -330,6 +385,7 @@ const Profile: React.FC<ProfileProps> = ({ userState, installPrompt, onToggleLan
       triggerHaptic('light');
       const date = new Date(y, m, d);
       setSelectedDate(date);
+      setShowCalendarDetail(true);
   };
   
   const renderCalendar = () => {
@@ -486,53 +542,6 @@ const Profile: React.FC<ProfileProps> = ({ userState, installPrompt, onToggleLan
            </div>
        )}
 
-       {/* -------------------------------------------------- */}
-       {/* APP INSTALLATION SECTION (NEW) */}
-       {/* -------------------------------------------------- */}
-       {!isStandalone && (
-           <div className="mb-8">
-               <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4 px-2">
-                   {lang === 'en' ? 'Get the App' : 'ऐप इंस्टॉल करें'}
-               </h3>
-               <div className="bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-700 rounded-2xl shadow-lg p-6 text-white relative overflow-hidden">
-                   <div className="absolute top-0 right-0 p-4 opacity-10"><Smartphone size={120} /></div>
-                   
-                   <div className="relative z-10">
-                       <h4 className="font-bold text-lg mb-2">{lang === 'en' ? 'Install for Offline Use' : 'ऑफ़लाइन उपयोग के लिए इंस्टॉल करें'}</h4>
-                       <p className="text-slate-300 text-sm mb-6 max-w-xs">
-                           {lang === 'en' 
-                            ? 'Get the full fullscreen experience and access your journal without internet.' 
-                            : 'फुलस्क्रीन अनुभव प्राप्त करें और इंटरनेट के बिना अपनी डायरी एक्सेस करें।'}
-                       </p>
-                       
-                       {installPrompt ? (
-                           <button 
-                               onClick={handleInstallClick}
-                               className="flex items-center space-x-2 px-6 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-colors font-bold text-sm shadow-lg"
-                           >
-                               <Download size={18} />
-                               <span>{lang === 'en' ? 'Install App' : 'ऐप इंस्टॉल करें'}</span>
-                           </button>
-                       ) : isIOS ? (
-                           <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10">
-                               <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">iOS Instructions</p>
-                               <ol className="text-sm space-y-2 list-decimal list-inside text-slate-200">
-                                   <li>Tap the <span className="font-bold">Share</span> button below.</li>
-                                   <li>Scroll down and tap <span className="font-bold">Add to Home Screen</span>.</li>
-                               </ol>
-                           </div>
-                       ) : (
-                           <div className="text-xs text-slate-400 italic border-t border-white/10 pt-4">
-                               {lang === 'en' 
-                                ? 'To install, look for "Add to Home Screen" in your browser menu.' 
-                                : 'इंस्टॉल करने के लिए, अपने ब्राउज़र मेनू में "होम स्क्रीन पर जोड़ें" देखें।'}
-                           </div>
-                       )}
-                   </div>
-               </div>
-           </div>
-       )}
-
        {/* Quick Stats Grid */}
        <div className="grid grid-cols-3 gap-3 mb-8">
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center">
@@ -552,41 +561,23 @@ const Profile: React.FC<ProfileProps> = ({ userState, installPrompt, onToggleLan
           </div>
        </div>
 
-       {/* Time Spent Section */}
-       <div className="mb-8">
-           <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4 px-2">
-               {lang === 'en' ? 'Time Invested' : 'समय निवेश'}
-           </h3>
-           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-4">
-               <div className="grid grid-cols-2 gap-4">
-                   <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                       <BookOpen className="mx-auto text-blue-500 mb-2" size={24} />
-                       <div className="text-2xl font-black text-slate-800 dark:text-white">
-                           {formatTimeSpent(userState.timeSpent?.reading || 0)}
-                       </div>
-                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                           {lang === 'en' ? 'Reading' : 'पढ़ना'}
-                       </div>
-                   </div>
-                   <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                       <Clock className="mx-auto text-emerald-500 mb-2" size={24} />
-                       <div className="text-2xl font-black text-slate-800 dark:text-white">
-                           {formatTimeSpent(userState.timeSpent?.total || 0)}
-                       </div>
-                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                           {lang === 'en' ? 'Total Time' : 'कुल समय'}
-                       </div>
-                   </div>
+       {/* Time Invested */}
+       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 mb-8">
+           <div className="flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                   <Clock className="text-emerald-500" size={20} />
+                   <span className="font-medium text-slate-700 dark:text-slate-300">{lang === 'en' ? 'Time Invested' : 'समय निवेश'}</span>
+               </div>
+               <div className="text-right">
+                   <span className="text-xl font-black text-slate-800 dark:text-white">{formatTimeSpent(userState.timeSpent?.total || 0)}</span>
+                   <span className="text-xs text-slate-400 ml-1">{lang === 'en' ? 'total' : 'कुल'}</span>
                </div>
            </div>
        </div>
 
-       {/* DAILY GOALS */}
-       <div className="mb-8 animate-fade-in">
-           <div className="flex items-center justify-between mb-4 px-2">
-               <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{lang === 'en' ? 'Daily Targets' : 'दैनिक लक्ष्य'}</h3>
-           </div>
-           
+       {/* Daily Targets */}
+       <div className="mb-8">
+           <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4 px-2">{lang === 'en' ? 'Daily Targets' : 'दैनिक लक्ष्य'}</h3>
            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
                {userState.dailyGoals && userState.dailyGoals.length > 0 ? (
                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -594,38 +585,38 @@ const Profile: React.FC<ProfileProps> = ({ userState, installPrompt, onToggleLan
                            const streak = calculateGoalStreak(goal.history);
                            const isCompletedToday = goal.history.includes(new Date().toLocaleDateString('en-CA'));
                            return (
-                               <div key={goal.id} className="p-4 flex items-center justify-between group">
+                               <div key={goal.id} className="p-4 flex items-center justify-between">
                                    <div className="flex items-center flex-1 mr-4">
                                        <button 
                                            onClick={() => handleToggleGoal(goal.id)}
-                                           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 mr-3 flex-shrink-0 ${isCompletedToday ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300 dark:border-slate-600 text-transparent hover:border-green-400'}`}
+                                           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-3 ${isCompletedToday ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300 dark:border-slate-600'}`}
                                        >
-                                           <Check size={14} strokeWidth={3} />
+                                           {isCompletedToday && <Check size={14} strokeWidth={3} />}
                                        </button>
-                                       <span className={`text-sm font-medium transition-all ${isCompletedToday ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-white'}`}>{goal.text}</span>
+                                       <span className={`text-sm ${isCompletedToday ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-white'}`}>{goal.text}</span>
                                    </div>
-                                   <div className="flex items-center space-x-3">
-                                       {streak > 0 && <div className="flex items-center space-x-1 text-orange-500"><Flame size={14} fill="currentColor" /><span className="text-xs font-bold">{streak}</span></div>}
-                                       <button onClick={() => handleDeleteGoal(goal.id)} className="text-slate-300 hover:text-red-500 p-1"><Trash2 size={16} /></button>
+                                   <div className="flex items-center gap-2">
+                                       {streak > 0 && <div className="flex items-center text-orange-500"><Flame size={14} /><span className="text-xs font-bold ml-1">{streak}</span></div>}
+                                       <button onClick={() => handleDeleteGoal(goal.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
                                    </div>
                                </div>
                            );
                        })}
                    </div>
                ) : (
-                   <div className="p-6 text-center text-slate-400 text-sm italic">No daily targets yet.</div>
+                   <div className="p-4 text-center text-slate-400 text-sm">{lang === 'en' ? 'No daily targets yet' : 'कोई दैनिक लक्ष्य नहीं'}</div>
                )}
-               <form onSubmit={handleAddGoal} className="p-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                   <div className="flex items-center">
-                       <input 
-                           type="text" 
-                           value={newGoalText}
-                           onChange={(e) => setNewGoalText(e.target.value)}
-                           placeholder="Add a new daily target..."
-                           className="flex-1 bg-transparent border-none outline-none text-sm p-3 text-slate-800 dark:text-white placeholder-slate-400"
-                       />
-                       <button type="submit" disabled={!newGoalText.trim()} className={`p-2 rounded-xl transition-all ${newGoalText.trim() ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}><Plus size={20} /></button>
-                   </div>
+               <form onSubmit={handleAddGoal} className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-2">
+                   <input 
+                       id="daily-target"
+                       name="daily-target"
+                       type="text" 
+                       value={newGoalText}
+                       onChange={(e) => setNewGoalText(e.target.value)}
+                       placeholder={lang === 'en' ? 'Add target...' : 'लक्ष्य जोड़ें...'}
+                       className="flex-1 bg-transparent text-sm p-2 text-slate-800 dark:text-white placeholder-slate-400 outline-none"
+                   />
+                   <button type="submit" disabled={!newGoalText.trim()} className={`px-3 py-2 rounded-lg ${newGoalText.trim() ? 'bg-orange-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}><Plus size={18} /></button>
                </form>
            </div>
        </div>
@@ -651,29 +642,413 @@ const Profile: React.FC<ProfileProps> = ({ userState, installPrompt, onToggleLan
            <div className="grid grid-cols-5 gap-2">{badges.map(b => <div key={b.id} className="flex flex-col items-center text-center"><BadgeIcon icon={b.icon} unlocked={b.unlocked} /><span className="text-[10px] font-medium text-slate-600 dark:text-slate-400">{b.label}</span></div>)}</div>
        </div>
 
-       {renderCalendar()}
+       {/* Completed Journeys / Certificates */}
+       {(() => {
+         const completedJourneys = Object.entries(userState.progress)
+           .filter(([_, prog]: [string, any]) => prog.completedDays.length >= 21)
+           .map(([moduleId, prog]) => {
+             const module = MODULES.find(m => m.id === moduleId);
+             return { moduleId, progress: prog, module };
+           })
+           .filter(j => j.module);
+         
+         if (completedJourneys.length === 0) return null;
+         
+         return (
+           <div className="mb-8">
+             <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4 px-2">
+               {lang === 'en' ? 'Certificates' : 'प्रमाणपत्र'}
+             </h3>
+             <div className="space-y-3">
+               {completedJourneys.map(({ moduleId, progress, module }) => (
+                 <button
+                   key={moduleId}
+                   onClick={() => { triggerHaptic('medium'); setShowCertificate(moduleId); }}
+                   className="w-full bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20 border border-amber-500/30 rounded-2xl p-4 flex items-center gap-4 hover:from-amber-500/20 hover:to-orange-500/20 transition-all group"
+                 >
+                   <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
+                     <Icons.Award size={28} className="text-white" />
+                   </div>
+                   <div className="flex-1 text-left">
+                     <p className="font-bold text-slate-900 dark:text-white">{module?.title[lang]}</p>
+                     <p className="text-xs text-slate-500 dark:text-slate-400">
+                       {lang === 'en' ? '21-Day Journey Completed' : '21-दिन की यात्रा पूर्ण'}
+                     </p>
+                   </div>
+                   <div className="flex items-center gap-2 text-orange-500">
+                     <span className="text-xs font-bold uppercase">{lang === 'en' ? 'View' : 'देखें'}</span>
+                     <ArrowRight size={16} />
+                   </div>
+                 </button>
+               ))}
+             </div>
+           </div>
+         );
+       })()}
 
-       {/* Notification Manager */}
-       <div className="mb-6">
-         <NotificationManager 
-           reminder={userState.reminder} 
-           onSetReminder={onSetReminder} 
-           lang={lang} 
-         />
+       {/* Quick Actions */}
+       <div className="grid grid-cols-2 gap-3 mb-8">
+          <button 
+            onClick={() => setShowShareModal(true)}
+            className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 hover:border-orange-300 dark:hover:border-orange-700 transition-colors text-center"
+          >
+            <Share2 size={24} className="mx-auto mb-2 text-orange-500" />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {lang === 'en' ? 'Share Progress' : 'प्रगति साझा करें'}
+            </span>
+          </button>
+          <Link 
+            to="/settings"
+            className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors text-center"
+          >
+            <Settings size={24} className="mx-auto mb-2 text-slate-500" />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {lang === 'en' ? 'Settings' : 'सेटिंग्स'}
+            </span>
+          </Link>
        </div>
 
-       {/* Settings */}
-       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden mb-6">
-          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between" onClick={onToggleLang}>
-             <span className="font-medium dark:text-white">Language</span><span className="text-xs font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/30 px-2 py-1 rounded">{lang === 'en' ? 'English' : 'हिन्दी'}</span>
-          </div>
-          <div className="px-6 py-4 flex justify-between border-b border-slate-100 dark:border-slate-800">
-             <span className="font-medium dark:text-white">Theme</span>
-             <div className="flex gap-2">{(['light', 'dark', 'system'] as Theme[]).map(t => <button key={t} onClick={() => onSetTheme(t)} className={`px-2 py-1 rounded text-xs font-bold border ${userState.theme === t ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900' : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>{UI_LABELS[t][lang]}</button>)}</div>
-          </div>
-       </div>
+       {/* Install App - Simplified */}
+       {!isStandalone && (
+           <div className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-4 mb-8 flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                   <Smartphone size={20} className="text-slate-500" />
+                   <span className="text-sm text-slate-600 dark:text-slate-400">
+                       {lang === 'en' ? 'Install for offline use' : 'ऑफ़लाइन के लिए इंस्टॉल करें'}
+                   </span>
+               </div>
+               {installPrompt ? (
+                   <button onClick={handleInstallClick} className="px-4 py-2 bg-orange-500 text-white text-sm font-bold rounded-lg">
+                       {lang === 'en' ? 'Install' : 'इंस्टॉल'}
+                   </button>
+               ) : (
+                   <button onClick={() => setShowInstallInstructions(true)} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium rounded-lg">
+                       {lang === 'en' ? 'How to' : 'कैसे करें'}
+                   </button>
+               )}
+           </div>
+       )}
 
-       <div className="text-center pb-8"><button onClick={() => confirm("Reset all?") && onReset()} className="text-xs font-bold text-red-400 flex items-center justify-center mx-auto"><Trash2 size={12} className="mr-1.5" /> Reset Progress</button></div>
+      {/* Delete Goal Confirmation Modal */}
+      {showDeleteGoalModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                <Trash2 size={24} className="text-red-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                {lang === 'en' ? 'Delete Goal?' : 'लक्ष्य हटाएं?'}
+              </h3>
+            </div>
+            <p className="text-slate-300 mb-6">
+              {lang === 'en' ? 'This goal will be permanently deleted.' : 'यह लक्ष्य स्थायी रूप से हटा दिया जाएगा।'}
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteGoalModal(null)} className="flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition-colors">
+                {lang === 'en' ? 'Cancel' : 'रद्द करें'}
+              </button>
+              <button onClick={confirmDeleteGoal} className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors">
+                {lang === 'en' ? 'Delete' : 'हटाएं'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset All Confirmation Modal */}
+      {showResetAllModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                <Trash2 size={24} className="text-red-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                {lang === 'en' ? 'Reset All Progress?' : 'सभी प्रगति रीसेट करें?'}
+              </h3>
+            </div>
+            <p className="text-slate-300 mb-6">
+              {lang === 'en' 
+                ? 'This will permanently delete all your journeys, journals, and progress. This action cannot be undone.'
+                : 'यह आपकी सभी यात्राओं, पत्रिकाओं और प्रगति को स्थायी रूप से हटा देगा। यह क्रिया पूर्ववत नहीं की जा सकती।'}
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowResetAllModal(false)} className="flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition-colors">
+                {lang === 'en' ? 'Cancel' : 'रद्द करें'}
+              </button>
+              <button onClick={() => { setShowResetAllModal(false); onReset(); }} className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors">
+                {lang === 'en' ? 'Reset All' : 'सब रीसेट करें'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Install Instructions Modal */}
+      {showInstallInstructions && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center">
+                <Download size={24} className="text-orange-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                {lang === 'en' ? 'How to Install' : 'इंस्टॉल कैसे करें'}
+              </h3>
+            </div>
+            <div className="text-slate-300 mb-6 space-y-3">
+              <p className="font-medium">{lang === 'en' ? 'Follow these steps:' : 'इन चरणों का पालन करें:'}</p>
+              <ol className="list-decimal list-inside space-y-2 text-sm">
+                <li>{lang === 'en' ? 'Click the menu icon (⋮) in your browser' : 'ब्राउज़र में मेनू आइकन (⋮) पर क्लिक करें'}</li>
+                <li>{lang === 'en' ? 'Look for "Install App" or "Add to Home Screen"' : '"ऐप इंस्टॉल करें" या "होम स्क्रीन पर जोड़ें" देखें'}</li>
+                <li>{lang === 'en' ? 'Tap Install to add the app' : 'ऐप जोड़ने के लिए इंस्टॉल पर टैप करें'}</li>
+              </ol>
+            </div>
+            <button 
+              onClick={() => setShowInstallInstructions(false)}
+              className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition-colors"
+            >
+              {lang === 'en' ? 'Got it' : 'समझ गया'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Share Progress Modal */}
+      {showShareModal && (() => {
+        const journeysStarted = Object.keys(userState.progress).length;
+        const journeysCompleted = Object.values(userState.progress).filter((p: any) => p.completedDays.length >= 21).length;
+        const totalTimeFormatted = formatTimeSpent(userState.timeSpent?.total || 0);
+        const unlockedBadges = badges.filter(b => b.unlocked);
+        
+        return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-orange-500 to-amber-600 rounded-3xl p-1 max-w-md w-full shadow-2xl">
+            <div className="bg-slate-900 rounded-[22px] overflow-hidden">
+              {/* Share Card Preview */}
+              <div className="bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 p-6 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20"></div>
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full -ml-16 -mb-16"></div>
+                <div className="absolute top-1/2 right-0 w-20 h-20 bg-white/5 rounded-full -mr-10"></div>
+                
+                <div className="relative z-10">
+                  {/* Header with Avatar & Name */}
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                      <DynamicIcon name={userState.avatar || 'User'} size={32} />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-2xl font-black">{userState.name || 'Friend'}</h3>
+                      <div className="flex items-center gap-2">
+                        <levelInfo.icon size={14} className="text-orange-200" />
+                        <span className="text-orange-100 text-sm font-medium">Level {levelInfo.level} • {levelInfo.title}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* XP Progress Bar */}
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 mb-4 border border-white/10">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-bold">{stats.xp} XP</span>
+                      <span className="text-orange-200">{levelInfo.max} XP to next level</span>
+                    </div>
+                    <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+                      <div className="h-full bg-white rounded-full transition-all" style={{ width: `${Math.min(100, nextLevelProgressPercent)}%` }}></div>
+                    </div>
+                  </div>
+                  
+                  {/* Main Stats Grid */}
+                  <div className="grid grid-cols-4 gap-2 mb-4">
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/10">
+                      <Flame size={18} className="mx-auto mb-1 text-orange-200" />
+                      <div className="text-xl font-black">{stats.currentStreak}</div>
+                      <div className="text-[9px] uppercase tracking-wider text-orange-200">Streak</div>
+                    </div>
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/10">
+                      <Trophy size={18} className="mx-auto mb-1 text-yellow-300" />
+                      <div className="text-xl font-black">{stats.completedDaysCount}</div>
+                      <div className="text-[9px] uppercase tracking-wider text-orange-200">Days</div>
+                    </div>
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/10">
+                      <BookOpen size={18} className="mx-auto mb-1 text-blue-300" />
+                      <div className="text-xl font-black">{stats.totalEntries}</div>
+                      <div className="text-[9px] uppercase tracking-wider text-orange-200">Journals</div>
+                    </div>
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/10">
+                      <Clock size={18} className="mx-auto mb-1 text-emerald-300" />
+                      <div className="text-xl font-black">{totalTimeFormatted}</div>
+                      <div className="text-[9px] uppercase tracking-wider text-orange-200">Time</div>
+                    </div>
+                  </div>
+
+                  {/* Journeys Progress */}
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 mb-4 border border-white/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Target size={16} className="text-orange-200" />
+                        <span className="text-sm font-medium">Journeys</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-black">{journeysStarted}</span>
+                        <span className="text-orange-200 text-sm"> started</span>
+                        {journeysCompleted > 0 && (
+                          <span className="ml-2 text-emerald-300 text-sm">• {journeysCompleted} completed</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Badges Row */}
+                  {unlockedBadges.length > 0 && (
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-[10px] uppercase tracking-wider text-orange-200 font-bold">Badges:</span>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {unlockedBadges.map(badge => (
+                          <div key={badge.id} className="flex items-center gap-1 bg-white/15 backdrop-blur-sm rounded-full px-2 py-1 border border-white/10">
+                            <badge.icon size={12} />
+                            <span className="text-[10px] font-medium">{badge.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                    <div className="flex items-center gap-2">
+                      <img src="/logo.svg" alt="Lapaas" className="w-5 h-5 rounded" />
+                      <span className="text-xs font-bold">LAPAAS MINDSET</span>
+                    </div>
+                    <span className="text-[10px] text-orange-200">21-Day Journey</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Share Actions */}
+              <div className="p-4 space-y-2">
+                {navigator.share && (
+                  <button
+                    onClick={handleNativeShare}
+                    className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition-colors flex items-center justify-center"
+                  >
+                    <Share2 size={18} className="mr-2" />
+                    {lang === 'en' ? 'Share' : 'साझा करें'}
+                  </button>
+                )}
+                <button
+                  onClick={() => { handleCopy(); triggerHaptic('medium'); }}
+                  className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center"
+                >
+                  <Icons.Copy size={18} className="mr-2" />
+                  {lang === 'en' ? 'Copy to Clipboard' : 'क्लिपबोर्ड पर कॉपी करें'}
+                </button>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="w-full py-2 text-slate-500 rounded-xl font-medium transition-colors text-sm"
+                >
+                  {lang === 'en' ? 'Close' : 'बंद करें'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* Calendar Detail Modal */}
+      {showCalendarDetail && selectedDate && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-indigo-500/20 rounded-full flex items-center justify-center">
+                  <CalendarIcon size={24} className="text-indigo-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    {selectedDate.toLocaleDateString(lang === 'en' ? 'en-US' : 'hi-IN', { weekday: 'long' })}
+                  </h3>
+                  <p className="text-sm text-slate-500">
+                    {selectedDate.toLocaleDateString(lang === 'en' ? 'en-US' : 'hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowCalendarDetail(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+            
+            {(() => {
+              const activities = getSelectedDateActivities();
+              if (activities.length === 0) {
+                return (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <CalendarIcon size={32} className="text-slate-300 dark:text-slate-600" />
+                    </div>
+                    <p className="text-slate-500 dark:text-slate-400">
+                      {lang === 'en' ? 'No activity on this day' : 'इस दिन कोई गतिविधि नहीं'}
+                    </p>
+                  </div>
+                );
+              }
+              
+              return (
+                <div className="space-y-3">
+                  {activities.map((activity, i) => (
+                    <Link 
+                      key={i}
+                      to={`/module/${activity.moduleId}/day/${activity.dayNumber}`}
+                      className="block p-4 bg-slate-50 dark:bg-slate-800 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      onClick={() => setShowCalendarDetail(false)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+                          <BookOpen size={18} className="text-orange-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-slate-900 dark:text-white text-sm">{activity.moduleName}</p>
+                          <p className="text-xs text-slate-500 mb-2">Day {activity.dayNumber}</p>
+                          {activity.text && (
+                            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 italic">
+                              "{activity.text.substring(0, 100)}{activity.text.length > 100 ? '...' : ''}"
+                            </p>
+                          )}
+                        </div>
+                        <ArrowRight size={16} className="text-slate-400 flex-shrink-0 mt-3" />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Certificate Modal */}
+      {showCertificate && userState.progress[showCertificate] && (
+        <Certificate
+          moduleId={showCertificate}
+          progress={userState.progress[showCertificate]}
+          userName={userState.name || 'Champion'}
+          lang={lang}
+          onClose={() => setShowCertificate(null)}
+          onShare={() => {
+            const module = MODULES.find(m => m.id === showCertificate);
+            if (navigator.share && module) {
+              navigator.share({
+                title: `${module.title[lang]} - Certificate`,
+                text: lang === 'en' 
+                  ? `I completed the 21-Day ${module.title.en} Journey on Lapaas Mindset! 🏆`
+                  : `मैंने Lapaas Mindset पर 21-दिन की ${module.title.hi} यात्रा पूरी की! 🏆`,
+                url: window.location.origin
+              });
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

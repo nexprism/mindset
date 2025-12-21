@@ -271,6 +271,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, userState, isHighlight 
 const Home: React.FC<HomeProps> = ({ userState }) => {
   const lang = userState.language;
   const streak = calculateStreak(userState);
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -293,10 +294,7 @@ const Home: React.FC<HomeProps> = ({ userState }) => {
   const hasReachedLimit = activeJourneys.length >= MAX_CONCURRENT_JOURNEYS;
 
   const handleLockedClick = () => {
-     const msg = lang === 'en'
-        ? `You can only have ${MAX_CONCURRENT_JOURNEYS} active journeys at a time. Complete one of your current journeys to start a new one.`
-        : `आप एक समय में केवल ${MAX_CONCURRENT_JOURNEYS} सक्रिय यात्राएं कर सकते हैं। नई यात्रा शुरू करने के लिए अपनी वर्तमान यात्राओं में से एक पूरी करें।`;
-     alert(msg);
+     setShowLimitModal(true);
   };
 
   // Split modules into recommended and others
@@ -423,6 +421,33 @@ const Home: React.FC<HomeProps> = ({ userState }) => {
           </div>
         </section>
       </div>
+
+      {/* Journey Limit Modal */}
+      {showLimitModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center">
+                <Lock size={24} className="text-amber-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                {lang === 'en' ? 'Journey Limit Reached' : 'यात्रा सीमा पूरी'}
+              </h3>
+            </div>
+            <p className="text-slate-300 mb-6">
+              {lang === 'en' 
+                ? `You can only have ${MAX_CONCURRENT_JOURNEYS} active journeys at a time. Complete one of your current journeys to start a new one.`
+                : `आप एक समय में केवल ${MAX_CONCURRENT_JOURNEYS} सक्रिय यात्राएं कर सकते हैं। नई यात्रा शुरू करने के लिए अपनी वर्तमान यात्राओं में से एक पूरी करें।`}
+            </p>
+            <button 
+              onClick={() => setShowLimitModal(false)} 
+              className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition-colors"
+            >
+              {lang === 'en' ? 'Got it' : 'समझ गया'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

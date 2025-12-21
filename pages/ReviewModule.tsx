@@ -12,6 +12,7 @@ interface ReviewModuleProps {
 const ReviewModule: React.FC<ReviewModuleProps> = ({ userState }) => {
   const { moduleId } = useParams<{ moduleId: string }>();
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
   
   const lang = userState.language;
   const module = MODULES.find(m => m.id === moduleId);
@@ -42,7 +43,8 @@ const ReviewModule: React.FC<ReviewModuleProps> = ({ userState }) => {
 
   const handleCopy = () => {
       navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
-      alert(UI_LABELS.copied[lang]);
+      setShowCopiedToast(true);
+      setTimeout(() => setShowCopiedToast(false), 2000);
       setShowShareModal(false);
   };
 
@@ -205,6 +207,14 @@ const ReviewModule: React.FC<ReviewModuleProps> = ({ userState }) => {
                    )}
                </div>
            </div>
+        </div>
+      )}
+
+      {/* Copied Toast */}
+      {showCopiedToast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-50">
+          <CheckCircle size={20} className="text-emerald-400" />
+          <span className="font-medium">{UI_LABELS.copied[lang]}</span>
         </div>
       )}
     </div>

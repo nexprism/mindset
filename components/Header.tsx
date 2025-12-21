@@ -12,7 +12,7 @@ const Header: React.FC<HeaderProps> = ({ currentLang, onToggleLang }) => {
   return (
     <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 shadow-sm border-b border-orange-100 dark:border-slate-800 transition-colors duration-300">
       <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center space-x-2">
+        <Link to="/home" className="flex items-center space-x-2">
           <img src="/logo.svg" alt="Lapaas" className="w-8 h-8 rounded-lg" />
           <span className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">
             LAPAAS <span className="text-orange-600 dark:text-orange-500">MINDSET</span>

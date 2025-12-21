@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Orange Background -->
+  <rect width="512" height="512" fill="#f97316"/>
+  
+  <!-- White Broken Circle - open at top right -->
+  <path d="M 256 76 
+           A 180 180 0 1 0 400 140" 
+        fill="none" 
+        stroke="white" 
+        stroke-width="32" 
+        stroke-linecap="round"/>
+  
+  <!-- Three Dots in center -->
+  <!-- Left hollow circle -->
+  <circle cx="176" cy="256" r="28" fill="none" stroke="white" stroke-width="12"/>
+  <!-- Center filled green circle -->
+  <circle cx="256" cy="256" r="28" fill="#4ade80"/>
+  <!-- Right hollow circle -->
+  <circle cx="336" cy="256" r="28" fill="none" stroke="white" stroke-width="12"/>
+</svg>

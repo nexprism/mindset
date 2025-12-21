@@ -1,10 +1,19 @@
 
-export type Language = 'en' | 'hi';
+export type Language = 'en' | 'hi' | 'es' | 'fr' | 'de' | 'zh' | 'ja' | 'pt' | 'ru' | 'it' | 'ar';
 export type Theme = 'light' | 'dark' | 'system';
 
 export interface LocalizedString {
   en: string;
   hi: string;
+  es: string;
+  fr: string;
+  de: string;
+  zh: string;
+  ja: string;
+  pt: string;
+  ru: string;
+  it: string;
+  ar: string;
 }
 
 export interface VocabularyItem {

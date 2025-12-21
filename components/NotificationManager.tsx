@@ -45,6 +45,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ reminder, onS
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [testSent, setTestSent] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -65,10 +66,15 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ reminder, onS
     }
   };
 
+  const handleAllowNotifications = async () => {
+    setShowPermissionModal(false);
+    await requestPermission();
+  };
+
   const handleToggle = async () => {
     if (!reminder.enabled) {
       if (permission !== 'granted') {
-        await requestPermission();
+        setShowPermissionModal(true);
       } else {
         onSetReminder({ ...reminder, enabled: true });
       }
@@ -88,7 +94,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ reminder, onS
 
   const sendTestNotification = async () => {
     if (permission !== 'granted') {
-      await requestPermission();
+      setShowPermissionModal(true);
       return;
     }
 
@@ -316,6 +322,62 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ reminder, onS
           </div>
         </div>
       </div>
+
+      {/* Custom Permission Modal */}
+      {showPermissionModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-slate-700">
+            {/* Icon */}
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <Bell size={32} className="text-white" />
+              </div>
+            </div>
+            
+            {/* Title */}
+            <h3 className="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">
+              {lang === 'en' ? 'Enable Notifications' : 'सूचनाएं चालू करें'}
+            </h3>
+            
+            {/* Description */}
+            <p className="text-slate-600 dark:text-slate-400 text-center mb-6 text-sm">
+              {lang === 'en' 
+                ? 'Get daily reminders to complete your mindset lessons and stay on track with your 21-day journey.'
+                : 'अपने माइंडसेट पाठ पूरे करने और 21 दिन की यात्रा पर बने रहने के लिए दैनिक रिमाइंडर पाएं।'}
+            </p>
+            
+            {/* Benefits */}
+            <div className="space-y-3 mb-6">
+              {[
+                { emoji: '🌅', text: lang === 'en' ? 'Morning motivation to start your day' : 'दिन शुरू करने के लिए सुबह की प्रेरणा' },
+                { emoji: '⏰', text: lang === 'en' ? 'Midday nudge to complete lessons' : 'पाठ पूरा करने के लिए दोपहर का संकेत' },
+                { emoji: '🌙', text: lang === 'en' ? 'Evening reflection reminders' : 'शाम के मनन रिमाइंडर' },
+              ].map((benefit, i) => (
+                <div key={i} className="flex items-center gap-3 text-sm">
+                  <span className="text-lg">{benefit.emoji}</span>
+                  <span className="text-slate-700 dark:text-slate-300">{benefit.text}</span>
+                </div>
+              ))}
+            </div>
+            
+            {/* Buttons */}
+            <div className="space-y-2">
+              <button
+                onClick={handleAllowNotifications}
+                className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition-colors"
+              >
+                {lang === 'en' ? 'Allow Notifications' : 'सूचनाएं अनुमति दें'}
+              </button>
+              <button
+                onClick={() => setShowPermissionModal(false)}
+                className="w-full py-3 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium transition-colors"
+              >
+                {lang === 'en' ? 'Not Now' : 'अभी नहीं'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

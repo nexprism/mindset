@@ -5,6 +5,7 @@ import { MODULES, UI_LABELS, ADDITIONAL_REFLECTION_PROMPTS } from '../constants'
 import { UserState, LocalizedString } from '../types';
 import { updateModuleProgress, triggerHaptic, addTimeSpent } from '../services/storage';
 import { ArrowLeft, BookOpen, CheckCircle, ChevronLeft, ChevronRight, PenTool, CheckSquare, Languages, Mic, MicOff, Clock, Trophy, ArrowRight, Check, Sparkles, Lock, SkipForward, Volume2, StopCircle, Play, Home } from 'lucide-react';
+import { AdPlaceholder } from '../components/AdSense';
 // @ts-ignore
 import confetti from 'canvas-confetti';
 
@@ -60,6 +61,11 @@ const ContentRenderer: React.FC<{ content: string; onComplete?: () => void }> = 
            return <h2 key={index} className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-6 mb-3">{trimmed.replace('## ', '')}</h2>;
         }
 
+        // Ad Placement Markers
+        if (trimmed.startsWith('<!-- AD_PLACEMENT')) {
+          return <AdPlaceholder key={index} type="horizontal" />;
+        }
+
         // Divider: ---
         if (trimmed === '---') {
           return <div key={index} className="py-6 flex justify-center"><div className="w-24 border-t-2 border-orange-100 dark:border-slate-700"></div></div>;
@@ -92,7 +98,8 @@ const ContentRenderer: React.FC<{ content: string; onComplete?: () => void }> = 
         // Metadata block (e.g. **Reading Time: ...**) - Render as chips/badges
         if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length < 80) {
              const text = trimmed.replace(/\*\*/g, '');
-             const isEndMarker = text === 'End of Reading' || text === 'पढ़ना समाप्त';
+             const endMarkers = ['End of Reading', 'पढ़ना समाप्त', 'Fin de la Lectura', 'Fin de la Lecture', 'Ende der Lesung', '阅读结束', '読書終了', 'Fim da Leitura', 'Конец чтения', 'Fine della Lettura', 'نهاية القراءة'];
+             const isEndMarker = endMarkers.includes(text);
 
              if (isEndMarker && onComplete) {
                  return (
@@ -140,6 +147,9 @@ const DayView: React.FC<DayViewProps> = ({ userState, onUpdate, onToggleLang }) 
   const [activePrompt, setActivePrompt] = useState<LocalizedString | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [unlockTimer, setUnlockTimer] = useState('');
+  const [showSkipModal, setShowSkipModal] = useState(false);
+  const [showSessionCompleteModal, setShowSessionCompleteModal] = useState(false);
+  const [showVoiceNotSupportedModal, setShowVoiceNotSupportedModal] = useState(false);
   
   // Audio State
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -171,11 +181,7 @@ const DayView: React.FC<DayViewProps> = ({ userState, onUpdate, onToggleLang }) 
             const lastDate = new Date(lastEntry.timestamp);
             const today = new Date();
             if (lastDate.toDateString() === today.toDateString()) {
-                const msg = lang === 'en' 
-                    ? "You've already completed a session today. Great habits are built with consistency, not intensity. Please come back tomorrow!"
-                    : "आपने आज का सत्र पूरा कर लिया है। महान आदतें निरंतरता से बनती हैं, तीव्रता से नहीं। कृपया कल वापस आएं!";
-                alert(msg);
-                navigate(`/module/${moduleId}`, { replace: true });
+                setShowSessionCompleteModal(true);
             }
         }
     }
@@ -381,7 +387,7 @@ const DayView: React.FC<DayViewProps> = ({ userState, onUpdate, onToggleLang }) 
     triggerHaptic('light');
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Voice input is not supported in this browser.");
+      setShowVoiceNotSupportedModal(true);
       return;
     }
     if (recognitionRef.current) {
@@ -826,7 +832,7 @@ const DayView: React.FC<DayViewProps> = ({ userState, onUpdate, onToggleLang }) 
                 {/* Go to Dashboard button - shows after completion */}
                 {isCompleted && !hasUnsavedChanges && (
                   <Link
-                    to="/"
+                    to="/home"
                     className="w-full py-4 mt-3 bg-orange-600 text-white rounded-xl font-bold shadow-lg hover:bg-orange-700 transition-colors flex items-center justify-center active:scale-95"
                   >
                     <Home size={20} className="mr-2" />
@@ -844,7 +850,7 @@ const DayView: React.FC<DayViewProps> = ({ userState, onUpdate, onToggleLang }) 
       {/* Top Nav */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 p-4 sticky top-0 z-40 shadow-sm pt-safe">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <Link to="/" className="text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
+          <Link to="/home" className="text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
             <ArrowLeft size={24} />
           </Link>
           <div className="text-center">
@@ -895,14 +901,7 @@ const DayView: React.FC<DayViewProps> = ({ userState, onUpdate, onToggleLang }) 
                          </div>
                          {nextDay && (
                            <button
-                             onClick={() => {
-                               const confirmMsg = lang === 'en'
-                                 ? '⚠️ Not Recommended!\n\nFor best results, complete one day at a time with proper rest. Rushing through days reduces the effectiveness of habit formation.\n\nAre you sure you want to continue to the next day?'
-                                 : '⚠️ अनुशंसित नहीं!\n\nसर्वोत्तम परिणामों के लिए, उचित आराम के साथ एक दिन में एक दिन पूरा करें। दिनों में जल्दबाजी करने से आदत निर्माण की प्रभावशीलता कम हो जाती है।\n\nक्या आप वाकई अगले दिन जारी रखना चाहते हैं?';
-                               if (confirm(confirmMsg)) {
-                                 window.location.href = `/module/${moduleId}/day/${nextDay}`;
-                               }
-                             }}
+                             onClick={() => setShowSkipModal(true)}
                              className="w-full py-3 bg-transparent text-slate-400 dark:text-slate-500 rounded-xl font-medium text-sm border border-dashed border-slate-300 dark:border-slate-700 hover:border-orange-400 hover:text-orange-500 dark:hover:text-orange-400 transition-all flex items-center justify-center"
                            >
                              <SkipForward size={16} className="mr-2" />
@@ -938,6 +937,106 @@ const DayView: React.FC<DayViewProps> = ({ userState, onUpdate, onToggleLang }) 
                  )}
              </div>
            </div>
+        )}
+
+        {/* Skip Wait Confirmation Modal */}
+        {showSkipModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+                <h3 className="text-xl font-bold text-white">
+                  {lang === 'en' ? 'Not Recommended!' : 'अनुशंसित नहीं!'}
+                </h3>
+              </div>
+              
+              <p className="text-slate-300 mb-6 leading-relaxed">
+                {lang === 'en' 
+                  ? 'For best results, complete one day at a time with proper rest. Rushing through days reduces the effectiveness of habit formation.'
+                  : 'सर्वोत्तम परिणामों के लिए, उचित आराम के साथ एक दिन में एक दिन पूरा करें। दिनों में जल्दबाजी करने से आदत निर्माण की प्रभावशीलता कम हो जाती है।'}
+              </p>
+              
+              <p className="text-slate-400 text-sm mb-6">
+                {lang === 'en' 
+                  ? 'Are you sure you want to continue to the next day?'
+                  : 'क्या आप वाकई अगले दिन जारी रखना चाहते हैं?'}
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSkipModal(false)}
+                  className="flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition-colors"
+                >
+                  {lang === 'en' ? 'Cancel' : 'रद्द करें'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSkipModal(false);
+                    window.location.href = `/module/${moduleId}/day/${nextDay}`;
+                  }}
+                  className="flex-1 py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition-colors"
+                >
+                  {lang === 'en' ? 'Continue' : 'जारी रखें'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Session Already Completed Modal */}
+        {showSessionCompleteModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                  <CheckCircle size={24} className="text-emerald-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">
+                  {lang === 'en' ? 'Great Work Today!' : 'आज बढ़िया काम!'}
+                </h3>
+              </div>
+              <p className="text-slate-300 mb-6">
+                {lang === 'en' 
+                  ? "You've already completed a session today. Great habits are built with consistency, not intensity. Please come back tomorrow!"
+                  : "आपने आज का सत्र पूरा कर लिया है। महान आदतें निरंतरता से बनती हैं, तीव्रता से नहीं। कृपया कल वापस आएं!"}
+              </p>
+              <button 
+                onClick={() => { setShowSessionCompleteModal(false); navigate(`/module/${moduleId}`, { replace: true }); }}
+                className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition-colors"
+              >
+                {lang === 'en' ? 'Got it' : 'समझ गया'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Voice Not Supported Modal */}
+        {showVoiceNotSupportedModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center">
+                  <MicOff size={24} className="text-amber-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">
+                  {lang === 'en' ? 'Voice Not Supported' : 'वॉइस समर्थित नहीं'}
+                </h3>
+              </div>
+              <p className="text-slate-300 mb-6">
+                {lang === 'en' 
+                  ? "Voice input is not supported in this browser. Please try using Chrome or Safari."
+                  : "इस ब्राउज़र में वॉइस इनपुट समर्थित नहीं है। कृपया Chrome या Safari का उपयोग करें।"}
+              </p>
+              <button 
+                onClick={() => setShowVoiceNotSupportedModal(false)}
+                className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition-colors"
+              >
+                {lang === 'en' ? 'OK' : 'ठीक है'}
+              </button>
+            </div>
+          </div>
         )}
 
       </div>

@@ -13,7 +13,7 @@ const Contact: React.FC = () => {
       {/* Header */}
       <div className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center">
-          <Link to="/" className="flex items-center text-slate-400 hover:text-white transition-colors mr-4">
+          <Link to="/home" className="flex items-center text-slate-400 hover:text-white transition-colors mr-4">
             <ArrowLeft size={20} />
           </Link>
           <h1 className="text-xl font-bold">Contact Us</h1>
@@ -120,7 +120,7 @@ const Contact: React.FC = () => {
         {/* Back to Home */}
         <div className="text-center">
           <Link 
-            to="/" 
+            to="/home" 
             className="inline-flex items-center px-6 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-colors"
           >
             <ArrowLeft size={18} className="mr-2" />
